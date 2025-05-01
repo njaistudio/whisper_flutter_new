@@ -57,7 +57,7 @@ Future<String> downloadModel(
     /// Huggingface url to download model
     modelUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-${model.modelName}.bin";
   } else {
-    modelUrl = "$downloadHost/ggml-${model.modelName}.bin";
+    modelUrl = downloadHost;
   }
   final savePath = "$destinationPath/ggml-${model.modelName}.bin";
   final dio = Dio();
