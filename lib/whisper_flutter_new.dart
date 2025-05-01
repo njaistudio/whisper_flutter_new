@@ -11,12 +11,13 @@ import "dart:ffi";
 import "dart:io";
 import "dart:isolate";
 
+import "package:dio/dio.dart";
 import "package:ffi/ffi.dart";
 import "package:flutter/foundation.dart";
 import "package:path_provider/path_provider.dart";
 import "package:whisper_flutter_new/bean/_models.dart";
 import "package:whisper_flutter_new/bean/whisper_dto.dart";
-import "package:whisper_flutter_new/download_model.dart";
+import "package:whisper_flutter_new/download_model.dart" as dm;
 import "package:whisper_flutter_new/whisper_bindings_generated.dart";
 
 export "package:whisper_flutter_new/bean/_models.dart";
@@ -30,7 +31,7 @@ class Whisper {
   const Whisper({required this.model, this.modelDir, this.downloadHost});
 
   /// model used for transcription
-  final WhisperModel model;
+  final dm.WhisperModel model;
 
   /// override of model storage path
   final String? modelDir;
@@ -56,6 +57,19 @@ class Whisper {
     return libraryDirectory.path;
   }
 
+  Future<bool> modelDownloaded() async {
+    final String modelDir = await _getModelDir();
+    final File modelFile = File(model.getPath(modelDir));
+    final bool isModelExist = modelFile.existsSync();
+    return isModelExist;
+  }
+
+  Future downloadModel({ProgressCallback? onProgress}) async {
+    final String modelDir = await _getModelDir();
+    return dm.downloadModel(
+    model: model, destinationPath: modelDir, downloadHost: downloadHost, onProgress: onProgress);
+  }
+
   Future<void> _initModel() async {
     final String modelDir = await _getModelDir();
     final File modelFile = File(model.getPath(modelDir));
@@ -66,7 +80,7 @@ class Whisper {
       }
       return;
     } else {
-      await downloadModel(
+      await dm.downloadModel(
           model: model, destinationPath: modelDir, downloadHost: downloadHost);
     }
   }
@@ -74,7 +88,7 @@ class Whisper {
   Future<Map<String, dynamic>> _request({
     required WhisperRequestDto whisperRequest,
   }) async {
-    if (model != WhisperModel.none) {
+    if (model != dm.WhisperModel.none) {
       await _initModel();
     }
     return Isolate.run(

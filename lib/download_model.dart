@@ -6,8 +6,7 @@
  * 所有代码均受中国《计算机软件保护条例》保护，侵权必究.
  */
 
-import "dart:io";
-
+import "package:dio/dio.dart";
 import "package:flutter/foundation.dart";
 
 /// Available whisper models
@@ -46,42 +45,49 @@ enum WhisperModel {
 Future<String> downloadModel(
     {required WhisperModel model,
     required String destinationPath,
-    String? downloadHost}) async {
+    String? downloadHost,
+    ProgressCallback? onProgress}) async {
   if (kDebugMode) {
     debugPrint("Download model ${model.modelName}");
   }
-  final httpClient = HttpClient();
 
-  Uri modelUri;
+  String modelUrl;
 
   if (downloadHost == null || downloadHost.isEmpty) {
     /// Huggingface url to download model
-    modelUri = Uri.parse(
-      "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-${model.modelName}.bin",
-    );
+    modelUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-${model.modelName}.bin";
   } else {
-    modelUri = Uri.parse(
-      "$downloadHost/ggml-${model.modelName}.bin",
+    modelUrl = "$downloadHost/ggml-${model.modelName}.bin";
+  }
+  final savePath = "$destinationPath/ggml-${model.modelName}.bin";
+  final dio = Dio();
+
+  try {
+    await dio.download(
+      modelUrl,
+      savePath,
+      onReceiveProgress: (received, total) {
+        onProgress?.call(received, total);
+        if (total != -1) {
+          final percent = (received / total * 100).toStringAsFixed(0);
+          if (kDebugMode) {
+            print("Progressing: $percent% ($received / $total bytes)");
+          }
+        } else {
+          if (kDebugMode) {
+            print("Received: $received bytes");
+          }
+        }
+      },
     );
+
+    if (kDebugMode) {
+      print("✅ Done: $savePath");
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      print("❌ Error when download file: $e");
+    }
   }
-
-  final request = await httpClient.getUrl(
-    modelUri,
-  );
-
-  final response = await request.close();
-
-  final file = File("$destinationPath/ggml-${model.modelName}.bin");
-  final raf = file.openSync(mode: FileMode.write);
-
-  await for (var chunk in response) {
-    raf.writeFromSync(chunk);
-  }
-
-  await raf.close();
-
-  if (kDebugMode) {
-    debugPrint("Download Down . Path = ${file.path}");
-  }
-  return file.path;
+  return savePath;
 }
